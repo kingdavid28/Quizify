@@ -1,0 +1,51 @@
+ History Quiz
+- Who was the first President of the United States?
+- Thomas Jefferson
+- George Washington ✅
+- John Adams
+- James Madison
+- The Great Wall of China was primarily built to protect against invasions from which group?
+- Mongols ✅
+- Persians
+- Romans
+- Japanese
+- In what year did World War II end?
+- 1943
+- 1944
+- 1945 ✅
+- 1946
+- The Magna Carta was signed in which country?
+- France
+- England ✅
+- Spain
+- Germany
+- Who was known as the "Maid of Orléans"?
+- Queen Elizabeth I
+- Joan of Arc ✅
+- Catherine the Great
+- Marie Antoinette
+- The Cold War was primarily between which two superpowers?
+- USA and Germany
+- USA and Soviet Union ✅
+- USA and Japan
+- USA and China
+- The pyramids of Giza were built in which ancient civilization?
+- Mesopotamia
+- Egypt ✅
+- Greece
+- Rome
+- The Renaissance began in which country?
+- France
+- Italy ✅
+- England
+- Spain
+- Who was the leader of the Soviet Union during World War II?
+- Vladimir Lenin
+- Joseph Stalin ✅
+- Nikita Khrushchev
+- Leon Trotsky
+- The American Civil War was fought between which two sides?
+- North and South ✅
+- East and West
+- Colonists and British
+- Democrats and Republicans
