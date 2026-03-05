@@ -57,7 +57,6 @@ export function QuizTaker() {
       setAnswers(new Array(data.questions.length).fill(''));
     } catch (error) {
       toast.error('Quiz not found');
-      console.error('Error loading quiz:', error);
     } finally {
       setLoading(false);
     }
@@ -118,8 +117,8 @@ export function QuizTaker() {
         navigate('/');
       }
     } catch (error) {
+      // Submit failed; user feedback provided
       toast.error('Failed to submit quiz');
-      console.error('Error submitting quiz:', error);
     } finally {
       setSubmitting(false);
     }

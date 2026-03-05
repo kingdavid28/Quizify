@@ -61,8 +61,8 @@ export function QuizAnalytics() {
       setQuiz(quizData);
       setAnalytics(analyticsData);
     } catch (error) {
+      // Analytics loading failed; user feedback provided
       toast.error('Failed to load analytics');
-      console.error('Error loading analytics:', error);
       navigate('/dashboard');
     } finally {
       setLoading(false);

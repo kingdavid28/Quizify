@@ -48,7 +48,6 @@ export function Signup() {
         }, 2000);
       } else {
         toast.error(error.message || 'Signup failed. Please try again.');
-        console.error('Signup error:', error);
       }
     } finally {
       setLoading(false);

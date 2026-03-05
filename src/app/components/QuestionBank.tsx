@@ -53,8 +53,8 @@ export function QuestionBank() {
       const data = await api.getQuestions(accessToken);
       setQuestions(data);
     } catch (error) {
+      // Questions loading failed; user feedback provided
       toast.error('Failed to load questions');
-      console.error('Error loading questions:', error);
     } finally {
       setLoading(false);
     }
@@ -80,8 +80,8 @@ export function QuestionBank() {
       setDialogOpen(false);
       resetNewQuestion();
     } catch (error) {
+      // Save failed; user feedback provided
       toast.error('Failed to save question');
-      console.error('Error saving question:', error);
     }
   };
 
@@ -93,8 +93,8 @@ export function QuestionBank() {
       setQuestions(questions.filter(q => q.id !== questionId));
       toast.success('Question deleted');
     } catch (error) {
+      // Delete failed; user feedback provided
       toast.error('Failed to delete question');
-      console.error('Error deleting question:', error);
     }
   };
 

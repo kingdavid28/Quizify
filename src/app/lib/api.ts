@@ -1,4 +1,4 @@
-import { supabase, hasSupabaseCredentials } from './supabase';
+import { supabase, hasSupabaseCredentials, API_URL } from './supabase';
 
 export interface Question {
   type: 'multiple-choice' | 'true-false' | 'short-answer';
@@ -55,6 +55,38 @@ export interface QuizAnalytics {
   recentAttempts: QuizAttempt[];
 }
 
+// Database response types - no longer needed with HTTP API
+// Keeping for reference but not used in new implementation
+
+// Helper function to make API calls
+const apiCall = async (
+  method: string,
+  endpoint: string,
+  accessToken: string | undefined,
+  body?: unknown
+): Promise<unknown> => {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
+
+  if (accessToken) {
+    headers.Authorization = `Bearer ${accessToken}`;
+  }
+
+  const response = await fetch(`${API_URL}${endpoint}`, {
+    method,
+    headers,
+    body: body ? JSON.stringify(body) : undefined,
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ error: response.statusText }));
+    throw new Error(error.error || `HTTP ${response.status}`);
+  }
+
+  return response.json();
+};
+
 // Local storage fallback helpers
 const localStorageAPI = {
   getQuizzes(userId: string): Quiz[] {
@@ -62,16 +94,16 @@ const localStorageAPI = {
     return quizzes.filter((q: Quiz) => q.userId === userId);
   },
   
-  saveQuizzes(quizzes: Quiz[]) {
+  saveQuizzes(quizzes: Quiz[]): void {
     localStorage.setItem('quizify_quizzes', JSON.stringify(quizzes));
   },
   
   getQuestions(userId: string): Question[] {
     const questions = JSON.parse(localStorage.getItem('quizify_questions') || '[]');
-    return questions.filter((q: any) => q.userId === userId);
+    return questions.filter((q: Question) => (q as unknown as { userId?: string }).userId === userId);
   },
   
-  saveQuestions(questions: any[]) {
+  saveQuestions(questions: Question[]): void {
     localStorage.setItem('quizify_questions', JSON.stringify(questions));
   },
   
@@ -79,46 +111,15 @@ const localStorageAPI = {
     return JSON.parse(localStorage.getItem('quizify_attempts') || '[]');
   },
   
-  saveAttempts(attempts: QuizAttempt[]) {
+  saveAttempts(attempts: QuizAttempt[]): void {
     localStorage.setItem('quizify_attempts', JSON.stringify(attempts));
   },
 };
 
-// Helper to convert database row to Quiz object
-function dbRowToQuiz(row: any): Quiz {
-  return {
-    id: row.id,
-    userId: row.user_id,
-    title: row.title,
-    description: row.description,
-    questions: row.questions,
-    settings: row.settings,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
-  };
-}
-
-// Helper to convert database row to QuizAttempt object
-function dbRowToAttempt(row: any): QuizAttempt {
-  return {
-    id: row.id,
-    quizId: row.quiz_id,
-    userName: row.user_name,
-    userEmail: row.user_email,
-    answers: row.answers,
-    score: row.score,
-    correctAnswers: row.correct_answers,
-    totalQuestions: row.total_questions,
-    passed: row.passed,
-    timeSpent: row.time_spent,
-    createdAt: row.created_at,
-  };
-}
-
 export const api = {
   // Quiz operations
   async createQuiz(accessToken: string, quizData: Partial<Quiz>): Promise<Quiz> {
-    if (!hasSupabaseCredentials) {
+    if (!hasSupabaseCredentials || !API_URL) {
       // Local storage fallback
       const session = JSON.parse(localStorage.getItem('quizify_session') || '{}');
       const quiz: Quiz = {
@@ -145,80 +146,46 @@ export const api = {
       return quiz;
     }
 
-    // Get current user
-    const { data: { user } } = await supabase.auth.getUser(accessToken);
-    if (!user) throw new Error('Not authenticated');
-
-    const { data, error } = await supabase
-      .from('quizzes')
-      .insert({
-        user_id: user.id,
-        title: quizData.title,
-        description: quizData.description,
-        questions: quizData.questions,
-        settings: quizData.settings,
-      })
-      .select()
-      .single();
-
-    if (error) throw error;
-    return dbRowToQuiz(data);
+    const response = await apiCall('POST', '/v1/quizzes', accessToken, quizData) as { quiz: Quiz };
+    return response.quiz;
   },
 
   async getQuizzes(accessToken: string): Promise<Quiz[]> {
-    if (!hasSupabaseCredentials) {
+    if (!hasSupabaseCredentials || !API_URL) {
       const session = JSON.parse(localStorage.getItem('quizify_session') || '{}');
       return localStorageAPI.getQuizzes(session.user?.id || '');
     }
 
-    const { data, error } = await supabase
-      .from('quizzes')
-      .select('*')
-      .order('created_at', { ascending: false });
-
-    if (error) throw error;
-    return data.map(dbRowToQuiz);
+    const response = await apiCall('GET', '/v1/quizzes', accessToken) as { quizzes: Quiz[] };
+    return response.quizzes || [];
   },
 
   async getQuiz(accessToken: string, quizId: string): Promise<Quiz> {
-    if (!hasSupabaseCredentials) {
+    if (!hasSupabaseCredentials || !API_URL) {
       const quizzes = JSON.parse(localStorage.getItem('quizify_quizzes') || '[]');
       const quiz = quizzes.find((q: Quiz) => q.id === quizId);
       if (!quiz) throw new Error('Quiz not found');
       return quiz;
     }
 
-    const { data, error } = await supabase
-      .from('quizzes')
-      .select('*')
-      .eq('id', quizId)
-      .single();
-
-    if (error) throw error;
-    return dbRowToQuiz(data);
+    const response = await apiCall('GET', `/v1/quizzes/${quizId}`, accessToken) as { quiz: Quiz };
+    return response.quiz;
   },
 
   async getPublicQuiz(quizId: string): Promise<Quiz> {
-    if (!hasSupabaseCredentials) {
+    if (!hasSupabaseCredentials || !API_URL) {
       const quizzes = JSON.parse(localStorage.getItem('quizify_quizzes') || '[]');
       const quiz = quizzes.find((q: Quiz) => q.id === quizId);
       if (!quiz) throw new Error('Quiz not found');
       return quiz;
     }
 
-    // For public access, we need to bypass RLS
-    const { data, error } = await supabase
-      .from('quizzes')
-      .select('*')
-      .eq('id', quizId)
-      .single();
-
-    if (error) throw error;
-    return dbRowToQuiz(data);
+    const response = await apiCall('GET', `/v1/quizzes/${quizId}/public`, undefined) as { quiz: Quiz };
+    return response.quiz;
   },
 
   async updateQuiz(accessToken: string, quizId: string, updates: Partial<Quiz>): Promise<Quiz> {
-    if (!hasSupabaseCredentials) {
+    if (!hasSupabaseCredentials || !API_URL) {
       const quizzes = JSON.parse(localStorage.getItem('quizify_quizzes') || '[]');
       const index = quizzes.findIndex((q: Quiz) => q.id === quizId);
       if (index === -1) throw new Error('Quiz not found');
@@ -233,42 +200,24 @@ export const api = {
       return quizzes[index];
     }
 
-    const updateData: any = {};
-    if (updates.title !== undefined) updateData.title = updates.title;
-    if (updates.description !== undefined) updateData.description = updates.description;
-    if (updates.questions !== undefined) updateData.questions = updates.questions;
-    if (updates.settings !== undefined) updateData.settings = updates.settings;
-
-    const { data, error } = await supabase
-      .from('quizzes')
-      .update(updateData)
-      .eq('id', quizId)
-      .select()
-      .single();
-
-    if (error) throw error;
-    return dbRowToQuiz(data);
+    const response = await apiCall('PUT', `/v1/quizzes/${quizId}`, accessToken, updates) as { quiz: Quiz };
+    return response.quiz;
   },
 
   async deleteQuiz(accessToken: string, quizId: string): Promise<void> {
-    if (!hasSupabaseCredentials) {
+    if (!hasSupabaseCredentials || !API_URL) {
       const quizzes = JSON.parse(localStorage.getItem('quizify_quizzes') || '[]');
       const filtered = quizzes.filter((q: Quiz) => q.id !== quizId);
       localStorageAPI.saveQuizzes(filtered);
       return;
     }
 
-    const { error } = await supabase
-      .from('quizzes')
-      .delete()
-      .eq('id', quizId);
-
-    if (error) throw error;
+    await apiCall('DELETE', `/v1/quizzes/${quizId}`, accessToken);
   },
 
   // Question bank operations
   async saveQuestion(accessToken: string, question: Question): Promise<Question> {
-    if (!hasSupabaseCredentials) {
+    if (!hasSupabaseCredentials || !API_URL) {
       const session = JSON.parse(localStorage.getItem('quizify_session') || '{}');
       const questionWithId = {
         ...question,
@@ -283,69 +232,29 @@ export const api = {
       return questionWithId;
     }
 
-    const { data: { user } } = await supabase.auth.getUser(accessToken);
-    if (!user) throw new Error('Not authenticated');
-
-    const { data, error } = await supabase
-      .from('questions')
-      .insert({
-        user_id: user.id,
-        type: question.type,
-        question: question.question,
-        options: question.options,
-        correct_answer: String(question.correctAnswer),
-        points: question.points || 1,
-      })
-      .select()
-      .single();
-
-    if (error) throw error;
-
-    return {
-      type: data.type,
-      question: data.question,
-      options: data.options,
-      correctAnswer: data.correct_answer,
-      points: data.points,
-    };
+    const response = await apiCall('POST', '/v1/questions', accessToken, question) as { question: Question };
+    return response.question;
   },
 
   async getQuestions(accessToken: string): Promise<Question[]> {
-    if (!hasSupabaseCredentials) {
+    if (!hasSupabaseCredentials || !API_URL) {
       const session = JSON.parse(localStorage.getItem('quizify_session') || '{}');
       return localStorageAPI.getQuestions(session.user?.id || '');
     }
 
-    const { data, error } = await supabase
-      .from('questions')
-      .select('*')
-      .order('created_at', { ascending: false });
-
-    if (error) throw error;
-
-    return data.map((row: any) => ({
-      type: row.type,
-      question: row.question,
-      options: row.options,
-      correctAnswer: row.correct_answer,
-      points: row.points,
-    }));
+    const response = await apiCall('GET', '/v1/questions', accessToken) as { questions: Question[] };
+    return response.questions || [];
   },
 
   async deleteQuestion(accessToken: string, questionId: string): Promise<void> {
-    if (!hasSupabaseCredentials) {
+    if (!hasSupabaseCredentials || !API_URL) {
       const questions = JSON.parse(localStorage.getItem('quizify_questions') || '[]');
-      const filtered = questions.filter((q: any) => q.id !== questionId);
+      const filtered = questions.filter((q: Question) => (q as unknown as { id?: string }).id !== questionId);
       localStorageAPI.saveQuestions(filtered);
       return;
     }
 
-    const { error } = await supabase
-      .from('questions')
-      .delete()
-      .eq('id', questionId);
-
-    if (error) throw error;
+    await apiCall('DELETE', `/v1/questions/${questionId}`, accessToken);
   },
 
   // Quiz attempt operations
@@ -358,7 +267,7 @@ export const api = {
       timeSpent: number;
     }
   ): Promise<QuizAttempt> {
-    if (!hasSupabaseCredentials) {
+    if (!hasSupabaseCredentials || !API_URL) {
       // Get quiz to calculate score
       const quizzes = JSON.parse(localStorage.getItem('quizify_quizzes') || '[]');
       const quiz = quizzes.find((q: Quiz) => q.id === quizId);
@@ -396,66 +305,12 @@ export const api = {
       return attempt;
     }
 
-    // Get quiz to calculate score
-    const { data: quizData, error: quizError } = await supabase
-      .from('quizzes')
-      .select('*')
-      .eq('id', quizId)
-      .single();
-
-    if (quizError) throw quizError;
-    
-    const quiz = dbRowToQuiz(quizData);
-    
-    // Calculate score
-    let correctAnswers = 0;
-    attemptData.answers.forEach((answer, index) => {
-      if (quiz.questions[index] && answer === quiz.questions[index].correctAnswer) {
-        correctAnswers++;
-      }
-    });
-    
-    const score = Math.round((correctAnswers / quiz.questions.length) * 100);
-    const passed = score >= quiz.settings.passingScore;
-
-    const { data, error } = await supabase
-      .from('quiz_attempts')
-      .insert({
-        quiz_id: quizId,
-        user_name: attemptData.userName,
-        user_email: attemptData.userEmail,
-        answers: attemptData.answers,
-        score,
-        correct_answers: correctAnswers,
-        total_questions: quiz.questions.length,
-        passed,
-        time_spent: attemptData.timeSpent,
-      })
-      .select()
-      .single();
-
-    if (error) throw error;
-    return dbRowToAttempt(data);
-  },
-
-  async getQuizAttempts(accessToken: string, quizId: string): Promise<QuizAttempt[]> {
-    if (!hasSupabaseCredentials) {
-      const attempts = localStorageAPI.getAttempts();
-      return attempts.filter(a => a.quizId === quizId);
-    }
-
-    const { data, error } = await supabase
-      .from('quiz_attempts')
-      .select('*')
-      .eq('quiz_id', quizId)
-      .order('created_at', { ascending: false });
-
-    if (error) throw error;
-    return data.map(dbRowToAttempt);
+    const response = await apiCall('POST', `/v1/quizzes/${quizId}/attempts`, undefined, attemptData) as { attempt: QuizAttempt };
+    return response.attempt;
   },
 
   async getQuizAnalytics(accessToken: string, quizId: string): Promise<QuizAnalytics> {
-    if (!hasSupabaseCredentials) {
+    if (!hasSupabaseCredentials || !API_URL) {
       const attempts = localStorageAPI.getAttempts().filter(a => a.quizId === quizId);
       const quizzes = JSON.parse(localStorage.getItem('quizify_quizzes') || '[]');
       const quiz = quizzes.find((q: Quiz) => q.id === quizId);
@@ -498,59 +353,7 @@ export const api = {
       };
     }
 
-    // Get quiz
-    const { data: quizData, error: quizError } = await supabase
-      .from('quizzes')
-      .select('*')
-      .eq('id', quizId)
-      .single();
-
-    if (quizError) throw quizError;
-    const quiz = dbRowToQuiz(quizData);
-
-    // Get all attempts
-    const { data: attemptsData, error: attemptsError } = await supabase
-      .from('quiz_attempts')
-      .select('*')
-      .eq('quiz_id', quizId)
-      .order('created_at', { ascending: false });
-
-    if (attemptsError) throw attemptsError;
-    const attempts = attemptsData.map(dbRowToAttempt);
-
-    const totalAttempts = attempts.length;
-    const averageScore = totalAttempts > 0
-      ? attempts.reduce((sum, a) => sum + a.score, 0) / totalAttempts
-      : 0;
-    const passRate = totalAttempts > 0
-      ? (attempts.filter(a => a.passed).length / totalAttempts) * 100
-      : 0;
-    const averageTimeSpent = totalAttempts > 0
-      ? attempts.reduce((sum, a) => sum + a.timeSpent, 0) / totalAttempts
-      : 0;
-    
-    // Calculate per-question stats
-    const questionStats = quiz.questions.map((q: Question, index: number) => {
-      const answersForQuestion = attempts.map(a => a.answers[index]);
-      const correctCount = answersForQuestion.filter(
-        answer => answer === q.correctAnswer
-      ).length;
-      
-      return {
-        questionIndex: index,
-        questionText: q.question,
-        correctPercentage: totalAttempts > 0 ? (correctCount / totalAttempts) * 100 : 0,
-        totalAnswered: totalAttempts,
-      };
-    });
-    
-    return {
-      totalAttempts,
-      averageScore,
-      passRate,
-      averageTimeSpent,
-      questionStats,
-      recentAttempts: attempts.slice(0, 10),
-    };
+    const response = await apiCall('GET', `/v1/quizzes/${quizId}/analytics`, accessToken) as { analytics: QuizAnalytics };
+    return response.analytics;
   },
 };

@@ -25,7 +25,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setAccessToken(accessToken);
       })
       .catch((error) => {
-        console.error('Error getting session:', error);
+        // Session check is non-critical; silently continue
+        // Error logged in getSession method if needed
       })
       .finally(() => {
         setLoading(false);

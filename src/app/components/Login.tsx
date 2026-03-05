@@ -5,27 +5,54 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from './ui/card';
+import { Alert, AlertDescription } from './ui/alert';
 import { Brain } from 'lucide-react';
 import { toast } from 'sonner';
+import { validateLoginForm } from '../lib/validation';
 
 export function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
   const { login } = useAuth();
   const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setValidationErrors({});
+
+    // Validate inputs
+    const errors = validateLoginForm(email, password);
+    if (errors.length > 0) {
+      const errorMap = errors.reduce((acc, err) => {
+        acc[err.field] = err.message;
+        return acc;
+      }, {} as Record<string, string>);
+      setValidationErrors(errorMap);
+      return;
+    }
+
     setLoading(true);
 
     try {
       await login(email, password);
       toast.success('Successfully logged in!');
       navigate('/dashboard');
-    } catch (error: any) {
-      toast.error(error.message || 'Login failed. Please check your credentials.');
-      console.error('Login error:', error);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Login failed. Please check your credentials.';
+      toast.error(errorMessage);
+
+      // Handle specific error cases
+      if (errorMessage.includes('Invalid email or password')) {
+        setValidationErrors({
+          submit: 'Invalid email or password. Please try again.',
+        });
+      } else {
+        setValidationErrors({
+          submit: errorMessage,
+        });
+      }
     } finally {
       setLoading(false);
     }
@@ -47,6 +74,11 @@ export function Login() {
             <CardDescription>Sign in to your account to continue</CardDescription>
           </CardHeader>
           <CardContent>
+            {validationErrors.submit && (
+              <Alert variant="destructive" className="mb-4">
+                <AlertDescription>{validationErrors.submit}</AlertDescription>
+              </Alert>
+            )}
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="email">Email</Label>
@@ -56,8 +88,12 @@ export function Login() {
                   placeholder="you@example.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  required
+                  disabled={loading}
+                  className={validationErrors.email ? 'border-red-500' : ''}
                 />
+                {validationErrors.email && (
+                  <p className="text-sm text-red-500">{validationErrors.email}</p>
+                )}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="password">Password</Label>
@@ -67,8 +103,12 @@ export function Login() {
                   placeholder="••••••••"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  required
+                  disabled={loading}
+                  className={validationErrors.password ? 'border-red-500' : ''}
                 />
+                {validationErrors.password && (
+                  <p className="text-sm text-red-500">{validationErrors.password}</p>
+                )}
               </div>
               <Button type="submit" className="w-full" disabled={loading}>
                 {loading ? 'Signing in...' : 'Sign In'}

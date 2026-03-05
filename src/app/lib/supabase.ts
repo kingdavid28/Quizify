@@ -1,32 +1,16 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { projectId, publicAnonKey } from '../../../utils/supabase/info';
 
 // Check if we have valid credentials
 const hasSupabaseCredentials = !!(projectId && publicAnonKey);
 
-// Create a dummy client for type compatibility
-const dummyClient = {
-  auth: {
-    signUp: async () => ({ data: { user: null, session: null }, error: new Error('No Supabase credentials') }),
-    signInWithPassword: async () => ({ data: { user: null, session: null }, error: new Error('No Supabase credentials') }),
-    signOut: async () => ({ error: new Error('No Supabase credentials') }),
-    getSession: async () => ({ data: { session: null }, error: new Error('No Supabase credentials') }),
-    getUser: async () => ({ data: { user: null }, error: new Error('No Supabase credentials') }),
-  },
-  from: () => ({
-    select: () => ({ data: null, error: new Error('No Supabase credentials') }),
-    insert: () => ({ data: null, error: new Error('No Supabase credentials') }),
-    update: () => ({ data: null, error: new Error('No Supabase credentials') }),
-    delete: () => ({ error: new Error('No Supabase credentials') }),
-  }),
-} as any;
-
-export const supabase = hasSupabaseCredentials 
+// Create the appropriate Supabase client
+const supabase: SupabaseClient = hasSupabaseCredentials 
   ? createClient(`https://${projectId}.supabase.co`, publicAnonKey)
-  : dummyClient;
+  : createClient('https://dummy.supabase.co', 'dummy_key');
 
 export const API_URL = hasSupabaseCredentials 
-  ? `https://${projectId}.supabase.co/functions/v1/make-server-a728d49f`
+  ? `https://${projectId}.supabase.co/functions/v1/server`
   : '';
 
-export { hasSupabaseCredentials };
+export { supabase, hasSupabaseCredentials };

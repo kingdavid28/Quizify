@@ -46,38 +46,41 @@ export function Dashboard() {
     }
   }, [accessToken]);
 
-  const loadQuizzes = async () => {
+  const loadQuizzes = async (): Promise<void> => {
     if (!accessToken) return;
     
     try {
       const data = await api.getQuizzes(accessToken);
       setQuizzes(data);
-    } catch (error: any) {
-      toast.error('Failed to load quizzes');
-      console.error('Error loading quizzes:', error);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to load quizzes';
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleLogout = async () => {
+  const handleLogout = async (): Promise<void> => {
     try {
       await logout();
       navigate('/');
-    } catch (error) {
-      toast.error('Logout failed');
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Logout failed';
+      toast.error(errorMessage);
     }
   };
 
-  const handleDeleteQuiz = async () => {
+  const handleDeleteQuiz = async (): Promise<void> => {
     if (!accessToken || !deleteQuizId) return;
 
     try {
       await api.deleteQuiz(accessToken, deleteQuizId);
       setQuizzes(quizzes.filter(q => q.id !== deleteQuizId));
       toast.success('Quiz deleted successfully');
-    } catch (error) {
-      toast.error('Failed to delete quiz');
+      setDeleteQuizId(null);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to delete quiz';
+      toast.error(errorMessage);
     } finally {
       setDeleteQuizId(null);
     }

@@ -68,8 +68,8 @@ export function QuizBuilder() {
       setQuestions(quiz.questions);
       setSettings(quiz.settings);
     } catch (error) {
+      // Quiz loading failed; user feedback provided
       toast.error('Failed to load quiz');
-      console.error('Error loading quiz:', error);
       navigate('/dashboard');
     } finally {
       setLoading(false);
@@ -123,8 +123,8 @@ export function QuizBuilder() {
         navigate(`/quiz/${quiz.id}/edit`);
       }
     } catch (error) {
+      // Save failed; user feedback provided
       toast.error('Failed to save quiz');
-      console.error('Error saving quiz:', error);
     } finally {
       setSaving(false);
     }

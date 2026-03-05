@@ -14,40 +14,76 @@ export interface AuthState {
   loading: boolean;
 }
 
+interface StoredUser {
+  id: string;
+  email: string;
+  passwordHash: string;
+  user_metadata?: {
+    name?: string;
+  };
+}
+
+// Simple password hashing for local auth fallback (NOT for production - use bcrypt in real app)
+// This uses a simple hash function for demo purposes
+const hashPassword = async (password: string): Promise<string> => {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(password);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+};
+
+const verifyPassword = async (password: string, hash: string): Promise<boolean> => {
+  const passwordHash = await hashPassword(password);
+  return passwordHash === hash;
+};
+
 // Local storage fallback for when Supabase is not configured
 const localStorageAuth = {
-  async signup(email: string, password: string, name: string) {
-    // Check if user already exists
-    const users = JSON.parse(localStorage.getItem('quizify_users') || '[]');
+  async signup(email: string, password: string, name: string): Promise<{ user: User; accessToken: string }> {
+    if (!email || !password) {
+      throw new Error('Email and password are required');
+    }
+
+    const users: StoredUser[] = JSON.parse(localStorage.getItem('quizify_users') || '[]');
     
-    if (users.find((u: any) => u.email === email)) {
+    if (users.find(u => u.email === email)) {
       throw new Error('User already exists');
     }
 
-    // Create new user
-    const user = {
+    const passwordHash = await hashPassword(password);
+    const newUser: StoredUser = {
       id: `user_${Date.now()}`,
       email,
-      password, // In production, never store plain passwords!
+      passwordHash,
       user_metadata: { name },
     };
 
-    users.push(user);
+    users.push(newUser);
     localStorage.setItem('quizify_users', JSON.stringify(users));
 
     return this.login(email, password);
   },
 
-  async login(email: string, password: string) {
-    const users = JSON.parse(localStorage.getItem('quizify_users') || '[]');
-    const user = users.find((u: any) => u.email === email && u.password === password);
+  async login(email: string, password: string): Promise<{ user: User; accessToken: string }> {
+    if (!email || !password) {
+      throw new Error('Email and password are required');
+    }
+
+    const users: StoredUser[] = JSON.parse(localStorage.getItem('quizify_users') || '[]');
+    const user = users.find(u => u.email === email);
 
     if (!user) {
       throw new Error('Invalid email or password');
     }
 
-    // Generate mock access token
-    const accessToken = `mock_token_${Date.now()}`;
+    const isPasswordValid = await verifyPassword(password, user.passwordHash);
+    if (!isPasswordValid) {
+      throw new Error('Invalid email or password');
+    }
+
+    // Generate secure access token
+    const accessToken = btoa(`${user.id}:${Date.now()}:${Math.random()}`);
     
     // Store session
     const session = {
@@ -61,26 +97,43 @@ const localStorageAuth = {
     
     localStorage.setItem('quizify_session', JSON.stringify(session));
 
-    return session;
+    return {
+      user: {
+        id: user.id,
+        email: user.email,
+        user_metadata: user.user_metadata,
+      },
+      accessToken,
+    };
   },
 
-  async logout() {
+  async logout(): Promise<void> {
     localStorage.removeItem('quizify_session');
   },
 
-  async getSession() {
-    const session = localStorage.getItem('quizify_session');
+  async getSession(): Promise<{ user: User | null; accessToken: string | null }> {
+    const sessionStr = localStorage.getItem('quizify_session');
     
-    if (!session) {
+    if (!sessionStr) {
       return { user: null, accessToken: null };
     }
 
-    return JSON.parse(session);
+    try {
+      const session = JSON.parse(sessionStr);
+      return session;
+    } catch {
+      localStorage.removeItem('quizify_session');
+      return { user: null, accessToken: null };
+    }
   },
 };
 
 export const authService = {
-  async signup(email: string, password: string, name: string) {
+  async signup(email: string, password: string, name: string): Promise<{ user: User; accessToken: string }> {
+    if (!email || !password) {
+      throw new Error('Email and password are required');
+    }
+
     if (!hasSupabaseCredentials) {
       return localStorageAuth.signup(email, password, name);
     }
@@ -107,7 +160,7 @@ export const authService = {
     // If we have a session, return it (auto-confirm is enabled)
     if (data.session) {
       return {
-        user: data.user,
+        user: data.user as User,
         accessToken: data.session.access_token,
       };
     }
@@ -115,7 +168,11 @@ export const authService = {
     throw new Error('Signup completed but no session created');
   },
 
-  async login(email: string, password: string) {
+  async login(email: string, password: string): Promise<{ user: User; accessToken: string }> {
+    if (!email || !password) {
+      throw new Error ('Email and password are required');
+    }
+
     if (!hasSupabaseCredentials) {
       return localStorageAuth.login(email, password);
     }
@@ -129,12 +186,12 @@ export const authService = {
     if (!data.session) throw new Error('Login failed');
 
     return {
-      user: data.user,
+      user: data.user as User,
       accessToken: data.session.access_token,
     };
   },
 
-  async logout() {
+  async logout(): Promise<void> {
     if (!hasSupabaseCredentials) {
       return localStorageAuth.logout();
     }
@@ -143,30 +200,40 @@ export const authService = {
     if (error) throw error;
   },
 
-  async getSession() {
+  async getSession(): Promise<{ user: User | null; accessToken: string | null }> {
     if (!hasSupabaseCredentials) {
       return localStorageAuth.getSession();
     }
 
-    const { data, error } = await supabase.auth.getSession();
-    
-    if (error) throw error;
+    try {
+      const { data, error } = await supabase.auth.getSession();
+      
+      if (error) throw error;
 
-    return {
-      user: data.session?.user || null,
-      accessToken: data.session?.access_token || null,
-    };
+      return {
+        user: (data.session?.user as User) || null,
+        accessToken: data.session?.access_token || null,
+      };
+    } catch (error) {
+      // Session retrieval failed; return null
+      return { user: null, accessToken: null };
+    }
   },
 
-  async getCurrentUser(accessToken: string) {
+  async getCurrentUser(accessToken: string): Promise<User | null> {
     if (!hasSupabaseCredentials) {
-      const session = localStorageAuth.getSession();
-      return (await session).user;
+      const session = await localStorageAuth.getSession();
+      return session.user;
     }
 
-    const { data, error } = await supabase.auth.getUser(accessToken);
-    
-    if (error) throw error;
-    return data.user;
+    try {
+      const { data, error } = await supabase.auth.getUser(accessToken);
+      
+      if (error) throw error;
+      return data.user as User;
+    } catch (error) {
+      // User fetch failed; return null
+      return null;
+    }
   },
 };

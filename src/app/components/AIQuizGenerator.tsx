@@ -65,36 +65,62 @@ export function AIQuizGenerator({ onQuestionsGenerated, onClose }: AIQuizGenerat
 
     const reader = new FileReader();
     reader.onload = (event) => {
-      const content = event.target?.result as string;
-      handleFileRead(content, file.name);
+      try {
+        const content = event.target?.result as string;
+        if (!content) {
+          toast.error('File is empty');
+          return;
+        }
+        handleFileRead(content, file.name);
+      } catch (error) {
+        // File read error handled below
+        toast.error('Failed to read file. Please try again.');
+      }
+    };
+    reader.onerror = () => {
+      // FileReader error; user feedback provided
+      toast.error('Failed to read file. Please try again.');
     };
     reader.readAsText(file);
   };
 
   const processContent = useCallback((text: string) => {
+    if (!text || text.trim().length === 0) {
+      toast.error('Content is empty. Please provide some text.');
+      return;
+    }
+
     setIsProcessing(true);
     setParseErrors([]);
     
     try {
       // Small delay to show processing state
       setTimeout(() => {
-        const result = parseQuizContent(text);
-        
-        if (result.errors.length > 0) {
-          setParseErrors(result.errors);
+        try {
+          const result = parseQuizContent(text);
+          
+          if (result.errors.length > 0) {
+            setParseErrors(result.errors);
+          }
+          
+          if (result.questions.length > 0) {
+            setPreviewQuestions(result.questions);
+            setDetectedTitle(result.title || '');
+            toast.success(`Generated ${result.questions.length} questions!`);
+          } else {
+            toast.error('No questions found. Please check your format.');
+          }
+          
+          setIsProcessing(false);
+        } catch (parseError) {
+          // Parse error handled below
+          const errorMessage = parseError instanceof Error ? parseError.message : 'Failed to process content';
+          setParseErrors([errorMessage]);
+          setIsProcessing(false);
         }
-        
-        if (result.questions.length > 0) {
-          setPreviewQuestions(result.questions);
-          setDetectedTitle(result.title || '');
-          toast.success(`Generated ${result.questions.length} questions!`);
-        } else {
-          toast.error('No questions found. Please check your format.');
-        }
-        
-        setIsProcessing(false);
       }, 500);
     } catch (error) {
+      // Processing error handled below
       setParseErrors(['Failed to process content']);
       setIsProcessing(false);
     }
@@ -106,19 +132,27 @@ export function AIQuizGenerator({ onQuestionsGenerated, onClose }: AIQuizGenerat
       return;
     }
 
-    onQuestionsGenerated(previewQuestions, detectedTitle);
-    toast.success('Questions added to quiz!');
+    try {
+      onQuestionsGenerated(previewQuestions, detectedTitle);
+      toast.success('Questions added to quiz!');
+    } catch (error) {
+      // Error adding questions handled below
+      toast.error('Failed to add questions. Please try again.');
+    }
   };
 
   const handlePaste = async () => {
     try {
       const text = await navigator.clipboard.readText();
-      if (text) {
-        setContent(text);
-        processContent(text);
+      if (!text || text.trim().length === 0) {
+        toast.error('Clipboard is empty');
+        return;
       }
+      setContent(text);
+      processContent(text);
     } catch (error) {
-      toast.error('Failed to read clipboard. Please paste manually.');
+      // Clipboard access error handled below
+      toast.error('Failed to read clipboard. Please paste manually or use the file upload.');
     }
   };
 
