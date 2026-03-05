@@ -28,17 +28,17 @@ app.use(
   "/*",
   cors({
     origin: (origin: string | undefined) => {
-      if (!origin) return undefined;
-      // Allow localhost for development, restrict in production
+      if (!origin) return '*';
+      // Allow localhost for development
       if (origin.includes('localhost') || origin.includes('127.0.0.1')) {
         return origin;
       }
       return allowedOrigins.includes(origin) ? origin : undefined;
     },
-    allowHeaders: ["Content-Type", "Authorization"],
+    allowHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
     allowMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    exposeHeaders: ["Content-Length", "X-RateLimit-Limit", "X-RateLimit-Remaining"],
-    maxAge: 600,
+    exposeHeaders: ["Content-Length", "X-RateLimit-Limit", "X-RateLimit-Remaining", "Retry-After"],
+    maxAge: 7200,
     credentials: true,
   }),
 );
