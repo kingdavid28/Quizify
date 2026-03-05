@@ -146,7 +146,7 @@ export const api = {
       return quiz;
     }
 
-    const response = await apiCall('POST', '/v1/quizzes', accessToken, quizData) as { quiz: Quiz };
+    const response = await apiCall('POST', '/server/v1/quizzes', accessToken, quizData) as { quiz: Quiz };
     return response.quiz;
   },
 
@@ -156,7 +156,7 @@ export const api = {
       return localStorageAPI.getQuizzes(session.user?.id || '');
     }
 
-    const response = await apiCall('GET', '/v1/quizzes', accessToken) as { quizzes: Quiz[] };
+    const response = await apiCall('GET', '/server/v1/quizzes', accessToken) as { quizzes: Quiz[] };
     return response.quizzes || [];
   },
 
@@ -168,7 +168,7 @@ export const api = {
       return quiz;
     }
 
-    const response = await apiCall('GET', `/v1/quizzes/${quizId}`, accessToken) as { quiz: Quiz };
+    const response = await apiCall('GET', `/server/v1/quizzes/${quizId}`, accessToken) as { quiz: Quiz };
     return response.quiz;
   },
 
@@ -180,7 +180,7 @@ export const api = {
       return quiz;
     }
 
-    const response = await apiCall('GET', `/v1/quizzes/${quizId}/public`, undefined) as { quiz: Quiz };
+    const response = await apiCall('GET', `/server/v1/quizzes/${quizId}/public`, undefined) as { quiz: Quiz };
     return response.quiz;
   },
 
@@ -200,7 +200,7 @@ export const api = {
       return quizzes[index];
     }
 
-    const response = await apiCall('PUT', `/v1/quizzes/${quizId}`, accessToken, updates) as { quiz: Quiz };
+    const response = await apiCall('PUT', `/server/v1/quizzes/${quizId}`, accessToken, updates) as { quiz: Quiz };
     return response.quiz;
   },
 
@@ -212,7 +212,7 @@ export const api = {
       return;
     }
 
-    await apiCall('DELETE', `/v1/quizzes/${quizId}`, accessToken);
+    await apiCall('DELETE', `/server/v1/quizzes/${quizId}`, accessToken);
   },
 
   // Question bank operations
@@ -232,7 +232,7 @@ export const api = {
       return questionWithId;
     }
 
-    const response = await apiCall('POST', '/v1/questions', accessToken, question) as { question: Question };
+    const response = await apiCall('POST', '/server/v1/questions', accessToken, question) as { question: Question };
     return response.question;
   },
 
@@ -242,7 +242,7 @@ export const api = {
       return localStorageAPI.getQuestions(session.user?.id || '');
     }
 
-    const response = await apiCall('GET', '/v1/questions', accessToken) as { questions: Question[] };
+    const response = await apiCall('GET', '/server/v1/questions', accessToken) as { questions: Question[] };
     return response.questions || [];
   },
 
@@ -254,7 +254,7 @@ export const api = {
       return;
     }
 
-    await apiCall('DELETE', `/v1/questions/${questionId}`, accessToken);
+    await apiCall('DELETE', `/server/v1/questions/${questionId}`, accessToken);
   },
 
   // Quiz attempt operations
@@ -305,7 +305,7 @@ export const api = {
       return attempt;
     }
 
-    const response = await apiCall('POST', `/v1/quizzes/${quizId}/attempts`, undefined, attemptData) as { attempt: QuizAttempt };
+    const response = await apiCall('POST', `/server/v1/quizzes/${quizId}/attempts`, undefined, attemptData) as { attempt: QuizAttempt };
     return response.attempt;
   },
 
@@ -353,7 +353,7 @@ export const api = {
       };
     }
 
-    const response = await apiCall('GET', `/v1/quizzes/${quizId}/analytics`, accessToken) as { analytics: QuizAnalytics };
+    const response = await apiCall('GET', `/server/v1/quizzes/${quizId}/analytics`, accessToken) as { analytics: QuizAnalytics };
     return response.analytics;
   },
 };
